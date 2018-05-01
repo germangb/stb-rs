@@ -131,37 +131,57 @@ mod tests {
     use std::os::raw;
     use std::ffi::CString;
 
-    #[test]
-    fn test_load_from_file() {
-        let image = ::image::load("assets/lenna.png", 3);
+    macro_rules! test_file {
+        ($(fn $name_test:ident() => $test_fn:ident ;)*) => {
+            $(
+                #[test]
+                fn $name_test() {
+                    let image = ::image::$test_fn("assets/lenna.png", 3);
 
-        assert!(image.is_ok());
+                    assert!(image.is_ok());
 
-        let image = image.unwrap();
-        assert_eq!(512, image.width);
-        assert_eq!(512, image.height);
-        assert_eq!(3, image.channels);
+                    let image = image.unwrap();
+                    assert_eq!(512, image.width);
+                    assert_eq!(512, image.height);
+                    assert_eq!(3, image.channels);
 
-        // load failure
-        let image = ::image::load("nope", 3);
-        assert!(image.is_err());
+                    // load failure
+                    let image = ::image::load("nope", 3);
+                    assert!(image.is_err());
+                }
+            )*
+        }
     }
 
-    #[test]
-    fn test_load_from_memory() {
-        let data = include_bytes!("../assets/lenna.png");
-        let image = ::image::load_from_memory(&data[..], 3);
+    macro_rules! test_memory {
+        ($(fn $name_test:ident() => $test_fn:ident ;)*) => {
+            $(
+                #[test]
+                fn $name_test() {
+                    let data = include_bytes!("../assets/lenna.png");
+                    let image = ::image::$test_fn(&data[..], 3);
+                    assert!(image.is_ok());
+                    let image = image.unwrap();
+                    assert_eq!(512, image.width);
+                    assert_eq!(512, image.height);
+                    assert_eq!(3, image.channels);
+                    let image = ::image::$test_fn(vec![0; 4], 3);
+                    assert!(image.is_err());
+                }
+            )*
+        }
+    }
 
-        assert!(image.is_ok());
+    test_file! {
+        fn test_load_from_file() => load;
+        fn test_load_16_from_file() => load_16;
+        fn test_loadf_from_file() => loadf;
+    }
 
-        let image = image.unwrap();
-        assert_eq!(512, image.width);
-        assert_eq!(512, image.height);
-        assert_eq!(3, image.channels);
-
-        // load failure
-        let image = ::image::load_from_memory(vec![0; 4], 3);
-        assert!(image.is_err());
+    test_memory! {
+        fn test_load_from_memory() => load_from_memory;
+        fn test_load_16_from_memory() => load_16_from_memory;
+        fn test_loadf_from_memory() => loadf_from_memory;
     }
 
     #[test]
