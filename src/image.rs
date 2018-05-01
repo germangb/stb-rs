@@ -37,11 +37,11 @@ macro_rules! from_memory {
 
                 unsafe {
                     let image_data = ffi::$stb_fn(data.as_ptr(),
-                                                data.len() as _,
-                                                &mut width,
-                                                &mut height,
-                                                &mut channels,
-                                                desired_channels as _);
+                                                  data.len() as _,
+                                                  &mut width,
+                                                  &mut height,
+                                                  &mut channels,
+                                                  desired_channels as _);
                     if image_data.is_null() {
                         let failure_reason = CStr::from_ptr(ffi::stbi_failure_reason() as _)
                             .to_string_lossy()
@@ -83,10 +83,10 @@ macro_rules! from_file {
 
                 unsafe {
                     let image_data = ffi::$stb_fn(CString::new(path.to_str().unwrap()).unwrap().into_raw(),
-                                                &mut width,
-                                                &mut height,
-                                                &mut channels,
-                                                desired_channels as _);
+                                                  &mut width,
+                                                  &mut height,
+                                                  &mut channels,
+                                                  desired_channels as _);
                     if image_data.is_null() {
                         let failure_reason = CStr::from_ptr(ffi::stbi_failure_reason() as _)
                             .to_string_lossy()
