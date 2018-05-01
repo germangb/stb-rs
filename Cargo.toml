@@ -1,0 +1,10 @@
+[package]
+name = "stb"
+version = "0.1.0"
+authors = ["germän gômez <germangb42@gmail.com>"]
+
+[dependencies]
+
+[build-dependencies]
+bindgen = "0.36"
+cc = "1.0"
