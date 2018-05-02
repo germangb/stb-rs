@@ -23,6 +23,18 @@ pub type ImageU8 = Image<u8>;
 pub type ImageU16 = Image<u16>;
 pub type ImageF32 = Image<f32>;
 
+impl<S> Image<S> {
+    #[inline]
+    pub fn as_ptr(&self) -> *const S {
+        self.data.as_ptr()
+    }
+
+    #[inline]
+    pub fn as_mut_ptr(&mut self) -> *mut S {
+        self.data.as_mut_ptr()
+    }
+}
+
 macro_rules! from_memory {
     ( $(pub fn $fn_name:ident ( ffi::$stb_fn:ident ) => $out_type:tt ; )*) => {
         $(
@@ -126,7 +138,7 @@ from_memory! {
 
 #[cfg(test)]
 mod tests {
-    use image::ffi;
+    use image::{ImageU8, ffi};
 
     use std::os::raw;
     use std::ffi::CString;
@@ -183,6 +195,23 @@ mod tests {
         fn test_load_16_from_memory() => load_16_from_memory;
         fn test_loadf_from_memory() => loadf_from_memory;
     }
+
+    /*#[test]
+    fn test_image_square() {
+        let mut image = ImageU8 {
+            width: 512,
+            height: 512,
+            channels: 3,
+            data: vec![],
+        };
+
+        assert!(image.is_square());
+        assert!(image.is_pot());
+
+        image.width = 921;
+        assert!(!image.is_square());
+        assert!(!image.is_pot());
+    }*/
 
     #[test]
     fn test_ffi() {
