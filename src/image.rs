@@ -2,7 +2,7 @@ use std::{ffi::{CStr, CString},
           //os::raw,
           path::Path};
 
-use StbResult;
+use {Result, Error};
 
 #[allow(non_snake_case)]
 #[allow(non_camel_case_types)]
@@ -38,7 +38,7 @@ impl<S> Image<S> {
 macro_rules! from_memory {
     ( $(pub fn $fn_name:ident ( ffi::$stb_fn:ident ) => $out_type:tt ; )*) => {
         $(
-            pub fn $fn_name<M>(memory: M, desired_channels: usize) -> StbResult<$out_type>
+            pub fn $fn_name<M>(memory: M, desired_channels: usize) -> Result<$out_type>
             where
                 M: AsRef<[u8]>,
             {
@@ -59,7 +59,7 @@ macro_rules! from_memory {
                             .to_string_lossy()
                             .into_owned();
 
-                        return Err(failure_reason);
+                        return Err(Error::Stb(failure_reason));
                     }
 
                     let width = width as usize;
@@ -82,7 +82,7 @@ macro_rules! from_memory {
 macro_rules! from_file {
     ( $(pub fn $fn_name:ident ( ffi::$stb_fn:ident ) => $out_type:tt ; )*) => {
         $(
-            pub fn $fn_name<P>(path: P, desired_channels: usize) -> StbResult<$out_type>
+            pub fn $fn_name<P>(path: P, desired_channels: usize) -> Result<$out_type>
             where
                 P: AsRef<Path>,
             {
@@ -104,7 +104,7 @@ macro_rules! from_file {
                             .to_string_lossy()
                             .into_owned();
 
-                        return Err(failure_reason);
+                        return Err(Error::Stb(failure_reason));
                     }
 
                     let width = width as usize;
