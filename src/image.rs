@@ -2,6 +2,8 @@ use std::{ffi::{CStr, CString},
           //os::raw,
           path::Path};
 
+use std::io::Read;
+
 use {Result, Error};
 
 #[allow(non_snake_case)]
@@ -79,6 +81,20 @@ macro_rules! from_memory {
     }
 }
 
+macro_rules! from_reader {
+    ( $(pub fn $fn_name:ident ( $memory_fn:ident ) => $out_type:tt ; )*) => {
+        $(
+            pub fn $fn_name<R: Read>(mut reader: R, desired_channels: usize) -> Result<$out_type> {
+                let mut data = Vec::new();
+                match reader.read_to_end(&mut data) {
+                    Err(e) => Err(Error::Io(e)),
+                    Ok(_) => $memory_fn(data, desired_channels),
+                }
+            }
+        )*
+    }
+}
+
 macro_rules! from_file {
     ( $(pub fn $fn_name:ident ( ffi::$stb_fn:ident ) => $out_type:tt ; )*) => {
         $(
@@ -134,6 +150,12 @@ from_memory! {
     pub fn load_from_memory(ffi::stbi_load_from_memory) => ImageU8;
     pub fn loadf_from_memory(ffi::stbi_loadf_from_memory) => ImageF32;
     pub fn load_16_from_memory(ffi::stbi_load_16_from_memory) => ImageU16;
+}
+
+from_reader! {
+    pub fn load_from_reader(load_from_memory) => ImageU8;
+    pub fn loadf_from_reader(loadf_from_memory) => ImageF32;
+    pub fn load_16_from_reader(load_16_from_memory) => ImageU16;
 }
 
 #[cfg(test)]
