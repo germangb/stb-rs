@@ -1,6 +1,5 @@
-use std::{ffi::{CStr, CString},
-          //os::raw,
-          path::Path};
+use std::ffi::CStr;
+use std::path::Path;
 
 use std::io::Read;
 
@@ -13,6 +12,31 @@ pub mod ffi {
     include!(concat!(env!("OUT_DIR"), "/stb_image.rs"));
 }
 
+use std::os::raw::c_int;
+
+
+pub trait Data {
+    unsafe fn from_memory(buffer: *const ffi::stbi_uc, len: c_int, x: *mut c_int, y: *mut c_int, c: *mut c_int, desired: c_int) -> *mut Self;
+}
+
+macro_rules! impl_traits {
+    ($($type:ty => ($file:ident, $mem:ident),)+) => {
+        $(
+            impl Data for $type {
+                unsafe fn from_memory(buffer: *const ffi::stbi_uc, len: c_int, x: *mut c_int, y: *mut c_int, c: *mut c_int, desired: c_int) -> *mut Self {
+                    ffi::$mem(buffer, len, x, y, c, desired) as _
+                }
+            }
+        )+
+    }
+}
+
+impl_traits! {
+    u8 => (stbi_load, stbi_load_from_memory),
+    u16 => (stbi_load_16, stbi_load_16_from_memory),
+    f32 => (stbi_loadf, stbi_loadf_from_memory),
+}
+
 #[derive(Debug)]
 pub struct Image<S> {
     width: usize,
@@ -21,7 +45,7 @@ pub struct Image<S> {
     data: *mut S,
 }
 
-unsafe impl<S> Send for Image<S> {
+unsafe impl<S: Data> Send for Image<S> {
 }
 
 impl<S> Drop for Image<S> {
@@ -30,7 +54,58 @@ impl<S> Drop for Image<S> {
     }
 }
 
-impl<S> Image<S> {
+impl<S: Data> Image<S> {
+}
+
+impl<S> Image<S>
+where
+    S: Data,
+{
+    pub fn from_reader<R: Read>(mut reader: R, desired_channels: usize) -> Result<Self> {
+        let mut data = Vec::new();
+        match reader.read_to_end(&mut data) {
+            Err(e) => Err(Error::Io(e)),
+            Ok(_) => Self::from_memory(data, desired_channels),
+        }
+    }
+
+    pub fn from_memory<M>(memory: M, desired_channels: usize) -> Result<Image<S>>
+    where
+        M: AsRef<[u8]>,
+    {
+        let data = memory.as_ref();
+        let mut width = 0;
+        let mut height = 0;
+        let mut channels = 0;
+
+        unsafe {
+            let image_data = S::from_memory(data.as_ptr(),
+                                            data.len() as _,
+                                            &mut width,
+                                            &mut height,
+                                            &mut channels,
+                                            desired_channels as _);
+            if image_data.is_null() {
+                let failure_reason = CStr::from_ptr(ffi::stbi_failure_reason() as _)
+                    .to_string_lossy()
+                    .into_owned();
+
+                return Err(Error::Stb(failure_reason));
+            }
+
+            let width = width as usize;
+            let height = height as usize;
+            let channels = channels as usize;
+
+            Ok(Image {
+                width,
+                height,
+                channels,
+                data: image_data,
+            })
+        }
+    }
+
     #[inline]
     pub fn as_ptr(&self) -> *const S {
         self.data
@@ -50,125 +125,6 @@ impl<S> Image<S> {
     pub fn channels(&self) -> usize {
         self.channels
     }
-}
-
-macro_rules! from_memory {
-    ( $(pub fn $fn_name:ident ( ffi::$stb_fn:ident ) => Image<$out_type:ty> ; )*) => {
-        $(
-            pub fn $fn_name<M>(memory: M, desired_channels: usize) -> Result<Image<$out_type>>
-            where
-                M: AsRef<[u8]>,
-            {
-                let data = memory.as_ref();
-                let mut width = 0;
-                let mut height = 0;
-                let mut channels = 0;
-
-                unsafe {
-                    let image_data = ffi::$stb_fn(data.as_ptr(),
-                                                  data.len() as _,
-                                                  &mut width,
-                                                  &mut height,
-                                                  &mut channels,
-                                                  desired_channels as _);
-                    if image_data.is_null() {
-                        let failure_reason = CStr::from_ptr(ffi::stbi_failure_reason() as _)
-                            .to_string_lossy()
-                            .into_owned();
-
-                        return Err(Error::Stb(failure_reason));
-                    }
-
-                    let width = width as usize;
-                    let height = height as usize;
-                    let channels = channels as usize;
-
-                    Ok(Image {
-                        width,
-                        height,
-                        channels,
-                        data: image_data,
-                    })
-                }
-            }
-        )*
-    }
-}
-
-macro_rules! from_reader {
-    ( $(pub fn $fn_name:ident ( $memory_fn:ident ) => Image<$out_type:tt> ; )*) => {
-        $(
-            pub fn $fn_name<R: Read>(mut reader: R, desired_channels: usize) -> Result<Image<$out_type>> {
-                let mut data = Vec::new();
-                match reader.read_to_end(&mut data) {
-                    Err(e) => Err(Error::Io(e)),
-                    Ok(_) => $memory_fn(data, desired_channels),
-                }
-            }
-        )*
-    }
-}
-
-macro_rules! from_file {
-    ( $(pub fn $fn_name:ident ( ffi::$stb_fn:ident ) => Image<$out_type:tt> ; )*) => {
-        $(
-            pub fn $fn_name<P>(path: P, desired_channels: usize) -> Result<Image<$out_type>>
-            where
-                P: AsRef<Path>,
-            {
-                //TODO This shouldn't panic
-                let path = path.as_ref();
-
-                let mut width = 0;
-                let mut height = 0;
-                let mut channels = 0;
-
-                unsafe {
-                    let image_data = ffi::$stb_fn(CString::new(path.to_str().unwrap()).unwrap().into_raw(),
-                                                  &mut width,
-                                                  &mut height,
-                                                  &mut channels,
-                                                  desired_channels as _);
-                    if image_data.is_null() {
-                        let failure_reason = CStr::from_ptr(ffi::stbi_failure_reason() as _)
-                            .to_string_lossy()
-                            .into_owned();
-
-                        return Err(Error::Stb(failure_reason));
-                    }
-
-                    let width = width as usize;
-                    let height = height as usize;
-                    let channels = channels as usize;
-
-                    Ok(Image {
-                        width,
-                        height,
-                        channels,
-                        data: image_data,
-                    })
-                }
-            }
-        )*
-    }
-}
-
-from_file! {
-    pub fn load(ffi::stbi_load) => Image<u8>;
-    pub fn loadf(ffi::stbi_loadf) => Image<f32>;
-    pub fn load_16(ffi::stbi_load_16) => Image<u16>;
-}
-
-from_memory! {
-    pub fn load_from_memory(ffi::stbi_load_from_memory) => Image<u8>;
-    pub fn loadf_from_memory(ffi::stbi_loadf_from_memory) => Image<f32>;
-    pub fn load_16_from_memory(ffi::stbi_load_16_from_memory) => Image<u16>;
-}
-
-from_reader! {
-    pub fn load_from_reader(load_from_memory) => Image<u8>;
-    pub fn loadf_from_reader(loadf_from_memory) => Image<f32>;
-    pub fn load_16_from_reader(load_16_from_memory) => Image<u16>;
 }
 
 #[cfg(test)]
