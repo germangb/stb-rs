@@ -15,9 +15,9 @@ pub mod ffi {
 
 #[derive(Debug)]
 pub struct Image<S> {
-    pub width: usize,
-    pub height: usize,
-    pub channels: usize,
+    width: usize,
+    height: usize,
+    channels: usize,
     data: *mut S,
 }
 
@@ -30,20 +30,32 @@ impl<S> Drop for Image<S> {
     }
 }
 
-pub type ImageU8 = Image<u8>;
-pub type ImageU16 = Image<u16>;
-pub type ImageF32 = Image<f32>;
-
 impl<S> Image<S> {
+    #[inline]
     pub fn as_ptr(&self) -> *const S {
         self.data
+    }
+
+    #[inline]
+    pub fn width(&self) -> usize {
+        self.width
+    }
+
+    #[inline]
+    pub fn height(&self) -> usize {
+        self.height
+    }
+
+    #[inline]
+    pub fn channels(&self) -> usize {
+        self.channels
     }
 }
 
 macro_rules! from_memory {
-    ( $(pub fn $fn_name:ident ( ffi::$stb_fn:ident ) => $out_type:tt ; )*) => {
+    ( $(pub fn $fn_name:ident ( ffi::$stb_fn:ident ) => Image<$out_type:ty> ; )*) => {
         $(
-            pub fn $fn_name<M>(memory: M, desired_channels: usize) -> Result<$out_type>
+            pub fn $fn_name<M>(memory: M, desired_channels: usize) -> Result<Image<$out_type>>
             where
                 M: AsRef<[u8]>,
             {
@@ -71,7 +83,7 @@ macro_rules! from_memory {
                     let height = height as usize;
                     let channels = channels as usize;
 
-                    Ok($out_type {
+                    Ok(Image {
                         width,
                         height,
                         channels,
@@ -84,9 +96,9 @@ macro_rules! from_memory {
 }
 
 macro_rules! from_reader {
-    ( $(pub fn $fn_name:ident ( $memory_fn:ident ) => $out_type:tt ; )*) => {
+    ( $(pub fn $fn_name:ident ( $memory_fn:ident ) => Image<$out_type:tt> ; )*) => {
         $(
-            pub fn $fn_name<R: Read>(mut reader: R, desired_channels: usize) -> Result<$out_type> {
+            pub fn $fn_name<R: Read>(mut reader: R, desired_channels: usize) -> Result<Image<$out_type>> {
                 let mut data = Vec::new();
                 match reader.read_to_end(&mut data) {
                     Err(e) => Err(Error::Io(e)),
@@ -98,9 +110,9 @@ macro_rules! from_reader {
 }
 
 macro_rules! from_file {
-    ( $(pub fn $fn_name:ident ( ffi::$stb_fn:ident ) => $out_type:tt ; )*) => {
+    ( $(pub fn $fn_name:ident ( ffi::$stb_fn:ident ) => Image<$out_type:tt> ; )*) => {
         $(
-            pub fn $fn_name<P>(path: P, desired_channels: usize) -> Result<$out_type>
+            pub fn $fn_name<P>(path: P, desired_channels: usize) -> Result<Image<$out_type>>
             where
                 P: AsRef<Path>,
             {
@@ -129,7 +141,7 @@ macro_rules! from_file {
                     let height = height as usize;
                     let channels = channels as usize;
 
-                    Ok($out_type {
+                    Ok(Image {
                         width,
                         height,
                         channels,
@@ -142,26 +154,26 @@ macro_rules! from_file {
 }
 
 from_file! {
-    pub fn load(ffi::stbi_load) => ImageU8;
-    pub fn loadf(ffi::stbi_loadf) => ImageF32;
-    pub fn load_16(ffi::stbi_load_16) => ImageU16;
+    pub fn load(ffi::stbi_load) => Image<u8>;
+    pub fn loadf(ffi::stbi_loadf) => Image<f32>;
+    pub fn load_16(ffi::stbi_load_16) => Image<u16>;
 }
 
 from_memory! {
-    pub fn load_from_memory(ffi::stbi_load_from_memory) => ImageU8;
-    pub fn loadf_from_memory(ffi::stbi_loadf_from_memory) => ImageF32;
-    pub fn load_16_from_memory(ffi::stbi_load_16_from_memory) => ImageU16;
+    pub fn load_from_memory(ffi::stbi_load_from_memory) => Image<u8>;
+    pub fn loadf_from_memory(ffi::stbi_loadf_from_memory) => Image<f32>;
+    pub fn load_16_from_memory(ffi::stbi_load_16_from_memory) => Image<u16>;
 }
 
 from_reader! {
-    pub fn load_from_reader(load_from_memory) => ImageU8;
-    pub fn loadf_from_reader(loadf_from_memory) => ImageF32;
-    pub fn load_16_from_reader(load_16_from_memory) => ImageU16;
+    pub fn load_from_reader(load_from_memory) => Image<u8>;
+    pub fn loadf_from_reader(loadf_from_memory) => Image<f32>;
+    pub fn load_16_from_reader(load_16_from_memory) => Image<u16>;
 }
 
 #[cfg(test)]
 mod tests {
-    use image::{ImageU8, ffi};
+    use image::{Image, ffi};
 
     use std::os::raw;
     use std::ffi::CString;
@@ -176,9 +188,9 @@ mod tests {
                     assert!(image.is_ok());
 
                     let image = image.unwrap();
-                    assert_eq!(512, image.width);
-                    assert_eq!(512, image.height);
-                    assert_eq!(3, image.channels);
+                    assert_eq!(512, image.width());
+                    assert_eq!(512, image.height());
+                    assert_eq!(3, image.channels());
 
                     // load failure
                     let image = ::image::load("nope", 3);
@@ -197,9 +209,9 @@ mod tests {
                     let image = ::image::$test_fn(&data[..], 3);
                     assert!(image.is_ok());
                     let image = image.unwrap();
-                    assert_eq!(512, image.width);
-                    assert_eq!(512, image.height);
-                    assert_eq!(3, image.channels);
+                    assert_eq!(512, image.width());
+                    assert_eq!(512, image.height());
+                    assert_eq!(3, image.channels());
                     let image = ::image::$test_fn(vec![0; 4], 3);
                     assert!(image.is_err());
                 }
@@ -218,23 +230,6 @@ mod tests {
         fn test_load_16_from_memory() => load_16_from_memory;
         fn test_loadf_from_memory() => loadf_from_memory;
     }
-
-    /*#[test]
-    fn test_image_square() {
-        let mut image = ImageU8 {
-            width: 512,
-            height: 512,
-            channels: 3,
-            data: vec![],
-        };
-
-        assert!(image.is_square());
-        assert!(image.is_pot());
-
-        image.width = 921;
-        assert!(!image.is_square());
-        assert!(!image.is_pot());
-    }*/
 
     #[test]
     fn test_ffi() {
