@@ -4,6 +4,7 @@ use std::{ffi::{CStr, CString},
 
 use std::io::Read;
 
+use Raw;
 use {Result, Error};
 
 #[allow(non_snake_case)]
@@ -13,12 +14,21 @@ pub mod ffi {
     include!(concat!(env!("OUT_DIR"), "/stb_image.rs"));
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Image<S> {
     pub width: usize,
     pub height: usize,
     pub channels: usize,
-    pub data: Vec<S>,
+    data: *mut S,
+}
+
+unsafe impl<S> Send for Image<S> {
+}
+
+impl<S> Drop for Image<S> {
+    fn drop(&mut self) {
+        unsafe { ffi::stbi_image_free(self.data as _) }
+    }
 }
 
 pub type ImageU8 = Image<u8>;
@@ -26,14 +36,8 @@ pub type ImageU16 = Image<u16>;
 pub type ImageF32 = Image<f32>;
 
 impl<S> Image<S> {
-    #[inline]
     pub fn as_ptr(&self) -> *const S {
-        self.data.as_ptr()
-    }
-
-    #[inline]
-    pub fn as_mut_ptr(&mut self) -> *mut S {
-        self.data.as_mut_ptr()
+        self.data
     }
 }
 
@@ -68,12 +72,11 @@ macro_rules! from_memory {
                     let height = height as usize;
                     let channels = channels as usize;
 
-                    let len = width * height * channels;
                     Ok($out_type {
                         width,
                         height,
                         channels,
-                        data: Vec::from_raw_parts(image_data as *mut _, len, len),
+                        data: image_data,
                     })
                 }
             }
@@ -127,12 +130,11 @@ macro_rules! from_file {
                     let height = height as usize;
                     let channels = channels as usize;
 
-                    let len = width * height * channels;
                     Ok($out_type {
                         width,
                         height,
                         channels,
-                        data: Vec::from_raw_parts(image_data as *mut _, len, len),
+                        data: image_data,
                     })
                 }
             }

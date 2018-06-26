@@ -11,6 +11,17 @@ pub enum Error {
     Io(io::Error),
 }
 
+#[derive(Debug)]
+pub struct Raw<T> {
+    ptr: *const T,
+}
+
+impl<T> Raw<T> {
+    pub fn as_ptr(&self) -> *const T {
+        self.ptr
+    }
+}
+
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
