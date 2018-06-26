@@ -1,4 +1,6 @@
 use std::ffi::CStr;
+use std::path::Path;
+use std::fs::File;
 
 use std::io::Read;
 
@@ -64,6 +66,10 @@ impl<S> Image<S>
 where
     S: Data,
 {
+    pub fn open<P: AsRef<Path>>(path: P, desired_channels: usize) -> Result<Self> {
+        Self::from_reader(File::open(path)?, desired_channels)
+    }
+
     pub fn from_reader<R: Read>(mut reader: R, desired_channels: usize) -> Result<Self> {
         let mut data = Vec::new();
 
