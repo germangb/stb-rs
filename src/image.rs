@@ -4,7 +4,6 @@ use std::{ffi::{CStr, CString},
 
 use std::io::Read;
 
-use Raw;
 use {Result, Error};
 
 #[allow(non_snake_case)]
