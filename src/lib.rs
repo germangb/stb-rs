@@ -1,5 +1,5 @@
-use std::io;
 use std::error::Error as StdError;
+use std::io;
 
 use std::fmt;
 
@@ -17,7 +17,7 @@ impl fmt::Display for Error {
             &Error::Stb(_) => write!(f, "Error::Stb"),
             &Error::Io(_) => write!(f, "Error::Io"),
         }
-    } 
+    }
 }
 
 impl StdError for Error {
@@ -33,6 +33,12 @@ impl StdError for Error {
             Error::Io(ref e) => e.cause(),
             _ => None,
         }
+    }
+}
+
+impl From<io::Error> for Error {
+    fn from(e: io::Error) -> Error {
+        Error::Io(e)
     }
 }
 

@@ -1,9 +1,8 @@
 use std::ffi::CStr;
-use std::path::Path;
 
 use std::io::Read;
 
-use {Result, Error};
+use {Error, Result};
 
 #[allow(non_snake_case)]
 #[allow(non_camel_case_types)]
@@ -14,9 +13,15 @@ pub mod ffi {
 
 use std::os::raw::c_int;
 
-
 pub trait Data {
-    unsafe fn from_memory(buffer: *const ffi::stbi_uc, len: c_int, x: *mut c_int, y: *mut c_int, c: *mut c_int, desired: c_int) -> *mut Self;
+    unsafe fn from_memory(
+        buffer: *const ffi::stbi_uc,
+        len: c_int,
+        x: *mut c_int,
+        y: *mut c_int,
+        c: *mut c_int,
+        desired: c_int,
+    ) -> *mut Self;
 }
 
 macro_rules! impl_traits {
@@ -45,8 +50,7 @@ pub struct Image<S> {
     data: *mut S,
 }
 
-unsafe impl<S: Data> Send for Image<S> {
-}
+unsafe impl<S: Data> Send for Image<S> {}
 
 impl<S> Drop for Image<S> {
     fn drop(&mut self) {
@@ -54,8 +58,7 @@ impl<S> Drop for Image<S> {
     }
 }
 
-impl<S: Data> Image<S> {
-}
+impl<S: Data> Image<S> {}
 
 impl<S> Image<S>
 where
@@ -63,10 +66,9 @@ where
 {
     pub fn from_reader<R: Read>(mut reader: R, desired_channels: usize) -> Result<Self> {
         let mut data = Vec::new();
-        match reader.read_to_end(&mut data) {
-            Err(e) => Err(Error::Io(e)),
-            Ok(_) => Self::from_memory(data, desired_channels),
-        }
+
+        reader.read_to_end(&mut data)?;
+        Self::from_memory(data, desired_channels)
     }
 
     pub fn from_memory<M>(memory: M, desired_channels: usize) -> Result<Image<S>>
@@ -79,12 +81,14 @@ where
         let mut channels = 0;
 
         unsafe {
-            let image_data = S::from_memory(data.as_ptr(),
-                                            data.len() as _,
-                                            &mut width,
-                                            &mut height,
-                                            &mut channels,
-                                            desired_channels as _);
+            let image_data = S::from_memory(
+                data.as_ptr(),
+                data.len() as _,
+                &mut width,
+                &mut height,
+                &mut channels,
+                desired_channels as _,
+            );
             if image_data.is_null() {
                 let failure_reason = CStr::from_ptr(ffi::stbi_failure_reason() as _)
                     .to_string_lossy()
@@ -129,10 +133,10 @@ where
 
 #[cfg(test)]
 mod tests {
-    use image::{Image, ffi};
+    use image::{ffi, Image};
 
-    use std::os::raw;
     use std::ffi::CString;
+    use std::os::raw;
 
     macro_rules! test_file {
         ($(fn $name_test:ident() => $test_fn:ident ;)*) => {
