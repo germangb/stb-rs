@@ -19,9 +19,9 @@ pub trait Data {
     unsafe fn from_memory(
         buffer: *const ffi::stbi_uc,
         len: c_int,
-        x: *mut c_int,
-        y: *mut c_int,
-        c: *mut c_int,
+        x: &mut c_int,
+        y: &mut c_int,
+        c: &mut c_int,
         desired: c_int,
     ) -> *mut Self;
 }
@@ -30,7 +30,14 @@ macro_rules! impl_traits {
     ($($type:ty => ($file:ident, $mem:ident),)+) => {
         $(
             impl Data for $type {
-                unsafe fn from_memory(buffer: *const ffi::stbi_uc, len: c_int, x: *mut c_int, y: *mut c_int, c: *mut c_int, desired: c_int) -> *mut Self {
+                unsafe fn from_memory(
+                    buffer: *const ffi::stbi_uc,
+                    len: c_int,
+                    x: &mut c_int,
+                    y: &mut c_int,
+                    c: &mut c_int,
+                    desired: c_int,
+                ) -> *mut Self {
                     ffi::$mem(buffer, len, x, y, c, desired) as _
                 }
             }
@@ -95,6 +102,7 @@ where
                 &mut channels,
                 desired_channels as _,
             );
+
             if image_data.is_null() {
                 let failure_reason = CStr::from_ptr(ffi::stbi_failure_reason() as _)
                     .to_string_lossy()
