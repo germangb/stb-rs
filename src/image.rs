@@ -24,6 +24,10 @@ pub trait Data {
         c: &mut c_int,
         desired: c_int,
     ) -> *mut Self;
+
+    unsafe fn free(ptr: *const Self) {
+        ffi::stbi_image_free(ptr as _)
+    }
 }
 
 macro_rules! impl_traits {
@@ -52,7 +56,7 @@ impl_traits! {
 }
 
 #[derive(Debug)]
-pub struct Image<S> {
+pub struct Image<S: Data> {
     width: usize,
     height: usize,
     channels: usize,
@@ -61,16 +65,24 @@ pub struct Image<S> {
 
 unsafe impl<S: Data> Send for Image<S> {}
 
-impl<S> Drop for Image<S> {
+impl<S: Data> Drop for Image<S> {
     fn drop(&mut self) {
-        unsafe { ffi::stbi_image_free(self.data as _) }
+        unsafe { S::free(self.data) }
     }
 }
 
-impl<S> Image<S>
-where
-    S: Data,
-{
+impl<S: Data> ::std::ops::Deref for Image<S> {
+    type Target = [S];
+
+    fn deref(&self) -> &Self::Target {
+        unsafe {
+            let len = self.width * self.height * self.channels;
+            ::std::slice::from_raw_parts(self.data, len)
+        }
+    }
+}
+
+impl<S: Data> Image<S> {
     pub fn from_file<P: AsRef<Path>>(path: P, desired_channels: usize) -> Result<Self> {
         Self::from_reader(File::open(path)?, desired_channels)
     }
@@ -123,11 +135,6 @@ where
     }
 
     #[inline]
-    pub fn as_ptr(&self) -> *const S {
-        self.data
-    }
-
-    #[inline]
     pub fn width(&self) -> usize {
         self.width
     }
@@ -156,6 +163,7 @@ mod tests {
                     assert_eq!(512, im.width());
                     assert_eq!(512, im.height());
                     assert_eq!(3, im.channels());
+                    assert_eq!(512*512*3, im.len());
                     assert!(Image::<$type>::from_file(".", 3).is_err());
                 )+
             }
