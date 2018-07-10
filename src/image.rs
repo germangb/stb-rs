@@ -82,6 +82,15 @@ impl<S: Data> ::std::ops::Deref for Image<S> {
     }
 }
 
+impl<S: Data> ::std::ops::DerefMut for Image<S> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        unsafe {
+            let len = self.width * self.height * self.channels;
+            ::std::slice::from_raw_parts_mut(self.data, len)
+        }
+    }
+}
+
 impl<S: Data> Image<S> {
     pub fn from_file<P: AsRef<Path>>(path: P, desired_channels: usize) -> Result<Self> {
         Self::from_reader(File::open(path)?, desired_channels)
