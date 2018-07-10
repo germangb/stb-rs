@@ -1,6 +1,6 @@
 use std::ffi::CStr;
-use std::path::Path;
 use std::fs::File;
+use std::path::Path;
 
 use std::io::Read;
 
@@ -27,7 +27,7 @@ pub trait Data {
 }
 
 macro_rules! impl_traits {
-    ($($type:ty => ($file:ident, $mem:ident),)+) => {
+    ($($type:ty => $mem:ident,)+) => {
         $(
             impl Data for $type {
                 unsafe fn from_memory(
@@ -46,9 +46,9 @@ macro_rules! impl_traits {
 }
 
 impl_traits! {
-    u8 => (stbi_load, stbi_load_from_memory),
-    u16 => (stbi_load_16, stbi_load_16_from_memory),
-    f32 => (stbi_loadf, stbi_loadf_from_memory),
+    u8 => stbi_load_from_memory,
+    u16 => stbi_load_16_from_memory,
+    f32 => stbi_loadf_from_memory,
 }
 
 #[derive(Debug)]
@@ -67,13 +67,11 @@ impl<S> Drop for Image<S> {
     }
 }
 
-impl<S: Data> Image<S> {}
-
 impl<S> Image<S>
 where
     S: Data,
 {
-    pub fn open<P: AsRef<Path>>(path: P, desired_channels: usize) -> Result<Self> {
+    pub fn from_file<P: AsRef<Path>>(path: P, desired_channels: usize) -> Result<Self> {
         Self::from_reader(File::open(path)?, desired_channels)
     }
 
@@ -147,80 +145,24 @@ where
 
 #[cfg(test)]
 mod tests {
-    use image::{ffi, Image};
+    use image::Image;
 
-    use std::ffi::CString;
-    use std::os::raw;
-
-    macro_rules! test_file {
-        ($(fn $name_test:ident() => $test_fn:ident ;)*) => {
-            $(
-                #[test]
-                fn $name_test() {
-                    let image = ::image::$test_fn("assets/lenna.png", 3);
-
-                    assert!(image.is_ok());
-
-                    let image = image.unwrap();
-                    assert_eq!(512, image.width());
-                    assert_eq!(512, image.height());
-                    assert_eq!(3, image.channels());
-
-                    // load failure
-                    let image = ::image::load("nope", 3);
-                    assert!(image.is_err());
-                }
-            )*
+    macro_rules! test_type {
+        ($($type:ty,)+) => {
+            #[test]
+            fn test() {
+                $(
+                    let im = Image::<$type>::from_file("assets/lenna.png", 3).unwrap();
+                    assert_eq!(512, im.width());
+                    assert_eq!(512, im.height());
+                    assert_eq!(3, im.channels());
+                    assert!(Image::<$type>::from_file(".", 3).is_err());
+                )+
+            }
         }
     }
 
-    macro_rules! test_memory {
-        ($(fn $name_test:ident() => $test_fn:ident ;)*) => {
-            $(
-                #[test]
-                fn $name_test() {
-                    let data = include_bytes!("../assets/lenna.png");
-                    let image = ::image::$test_fn(&data[..], 3);
-                    assert!(image.is_ok());
-                    let image = image.unwrap();
-                    assert_eq!(512, image.width());
-                    assert_eq!(512, image.height());
-                    assert_eq!(3, image.channels());
-                    let image = ::image::$test_fn(vec![0; 4], 3);
-                    assert!(image.is_err());
-                }
-            )*
-        }
-    }
-
-    test_file! {
-        fn test_load_from_file() => load;
-        fn test_load_16_from_file() => load_16;
-        fn test_loadf_from_file() => loadf;
-    }
-
-    test_memory! {
-        fn test_load_from_memory() => load_from_memory;
-        fn test_load_16_from_memory() => load_16_from_memory;
-        fn test_loadf_from_memory() => loadf_from_memory;
-    }
-
-    #[test]
-    fn test_ffi() {
-        let mut x: raw::c_int = 0;
-        let mut y: raw::c_int = 0;
-        let mut channels: raw::c_int = 0;
-
-        let lenna_file = CString::new("assets/lenna.png").unwrap();
-        let data =
-            unsafe { ffi::stbi_load(lenna_file.into_raw(), &mut x, &mut y, &mut channels, 3) };
-
-        assert_eq!(512, x);
-        assert_eq!(512, y);
-        assert_eq!(3, channels);
-
-        unsafe {
-            ffi::stbi_image_free(data as _);
-        }
+    test_type! {
+        f32, u16, u8,
     }
 }
