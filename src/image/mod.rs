@@ -1,3 +1,11 @@
+pub mod format;
+pub mod ffi {
+    #![allow(non_snake_case)]
+    #![allow(non_camel_case_types)]
+    #![allow(non_upper_case_globals)]
+    include!(concat!(env!("OUT_DIR"), "/stb_image.rs"));
+}
+
 use std::ffi::CStr;
 use std::fs;
 use std::path::Path;
@@ -7,147 +15,9 @@ use std::slice;
 
 use {Error, Result};
 
-#[allow(non_snake_case)]
-#[allow(non_camel_case_types)]
-#[allow(non_upper_case_globals)]
-pub mod ffi {
-    include!(concat!(env!("OUT_DIR"), "/stb_image.rs"));
-}
+use self::format::PixelFormat;
 
-pub mod pixelformat {
-    use super::ffi;
-
-    use std::os::raw;
-
-    pub trait PixelFormat {
-        type Item: Copy;
-
-        fn size() -> usize;
-
-        unsafe fn load_from_memory(buffer: *const ffi::stbi_uc,
-                                   len: raw::c_int,
-                                   x: &mut raw::c_int,
-                                   y: &mut raw::c_int,
-                                   c: &mut raw::c_int) -> *mut Self;
-    }
-
-    macro_rules! impl_formats {
-        (
-            $(
-                $(#[$meta_enum:meta])*
-                pub enum $enum:ident {
-                    size => $size:expr,
-                    item => $item:ty,
-                    ffi => $ffi:path,
-                }
-            )+
-        ) => {
-            $(
-                $(#[$meta_enum])*
-                pub enum $enum {}
-                impl PixelFormat for $enum {
-                    type Item = $item;
-                    #[inline]
-                    unsafe fn load_from_memory(buffer: *const ffi::stbi_uc,
-                                               len: raw::c_int,
-                                               x: &mut raw::c_int,
-                                               y: &mut raw::c_int,
-                                               c: &mut raw::c_int) -> *mut Self {
-                        $ffi(buffer, len, x, y, c, Self::size() as _) as _
-                    }
-                    #[inline]
-                    fn size() -> usize {
-                        $size
-                    }
-                }
-            )+
-        }
-    }
-
-    impl_formats! {
-        // 8bit
-
-        pub enum R8 {
-            size => 1,
-            item => (u8),
-            ffi => ffi::stbi_load_from_memory,
-        }
-
-        pub enum Rg8 {
-            size => 2,
-            item => (u8, u8),
-            ffi => ffi::stbi_load_from_memory,
-        }
-
-        pub enum Rgb8 {
-            size => 3,
-            item => (u8, u8, u8),
-            ffi => ffi::stbi_load_from_memory,
-        }
-
-        pub enum Rgba8 {
-            size => 4,
-            item => (u8, u8, u8, u8),
-            ffi => ffi::stbi_load_from_memory,
-        }
-
-        // 16bit
-
-        pub enum R16 {
-            size => 1,
-            item => (u16),
-            ffi => ffi::stbi_load_16_from_memory,
-        }
-
-        pub enum Rg16 {
-            size => 2,
-            item => (u16, u16),
-            ffi => ffi::stbi_load_16_from_memory,
-        }
-
-        pub enum Rgb16 {
-            size => 3,
-            item => (u16, u16, u16),
-            ffi => ffi::stbi_load_16_from_memory,
-        }
-
-        pub enum Rgba16 {
-            size => 4,
-            item => (u16, u16, u16, u16),
-            ffi => ffi::stbi_load_16_from_memory,
-        }
-
-        // float32
-
-        pub enum R32f {
-            size => 1,
-            item => (f32),
-            ffi => ffi::stbi_loadf_from_memory,
-        }
-
-        pub enum Rg32f {
-            size => 2,
-            item => (f32, f32),
-            ffi => ffi::stbi_loadf_from_memory,
-        }
-
-        pub enum Rgb32f {
-            size => 3,
-            item => (f32, f32, f32),
-            ffi => ffi::stbi_loadf_from_memory,
-        }
-
-        pub enum Rgba32f {
-            size => 4,
-            item => (f32, f32, f32, f32),
-            ffi => ffi::stbi_loadf_from_memory,
-        }
-    }
-}
-
-use self::pixelformat::PixelFormat;
-
-pub use self::pixelformat::{
+pub use self::format::{
     R8, Rg8, Rgb8, Rgba8,
     R16, Rg16, Rgb16, Rgba16,
     R32f, Rg32f, Rgb32f, Rgba32f,
