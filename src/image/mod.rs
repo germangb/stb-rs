@@ -17,7 +17,7 @@ use std::slice;
 
 use {Error, Result};
 
-use self::format::{PixelData, PixelFormat};
+use self::format::{TexelData, TexelFormat};
 
 /*
 pub use self::format::{
@@ -27,25 +27,25 @@ pub use self::format::{
 
 pub use self::format::{Rg, Rgb, Rgba, R};
 
-pub struct Pixels<'a, F, D>
+pub struct Texels<'a, F, D>
 where
-    D: 'a + PixelData,
-    F: 'a + PixelFormat<D>,
+    D: 'a + TexelData,
+    F: 'a + TexelFormat<D>,
 {
     inner: Cloned<slice::Iter<'a, F::Item>>,
     total: usize,
 }
 
-impl<'a, F, D> ExactSizeIterator for Pixels<'a, F, D>
+impl<'a, F, D> ExactSizeIterator for Texels<'a, F, D>
 where
-    D: 'a + PixelData,
-    F: 'a + PixelFormat<D>,
+    D: 'a + TexelData,
+    F: 'a + TexelFormat<D>,
 {}
 
-impl<'a, F, D> Iterator for Pixels<'a, F, D>
+impl<'a, F, D> Iterator for Texels<'a, F, D>
 where
-    D: 'a + PixelData,
-    F: 'a + PixelFormat<D>,
+    D: 'a + TexelData,
+    F: 'a + TexelFormat<D>,
 {
     type Item = F::Item;
 
@@ -58,7 +58,7 @@ where
     }
 }
 
-pub struct Image<P: PixelFormat<D>, D: PixelData> {
+pub struct Image<P: TexelFormat<D>, D: TexelData> {
     width: usize,
     height: usize,
     data: *mut P,
@@ -67,15 +67,15 @@ pub struct Image<P: PixelFormat<D>, D: PixelData> {
 
 unsafe impl<P, D> Send for Image<P, D>
 where
-    P: PixelFormat<D>,
-    D: PixelData,
+    P: TexelFormat<D>,
+    D: TexelData,
 {
 }
 
 impl<P, D> Drop for Image<P, D>
 where
-    D: PixelData,
-    P: PixelFormat<D>,
+    D: TexelData,
+    P: TexelFormat<D>,
 {
     fn drop(&mut self) {
         unsafe { ffi::stbi_image_free(self.data as _) }
@@ -84,8 +84,8 @@ where
 
 impl<F, D> Image<F, D>
 where
-    D: PixelData,
-    F: PixelFormat<D>,
+    D: TexelData,
+    F: TexelFormat<D>,
 {
     #[inline]
     pub fn channels(&self) -> usize {
@@ -114,8 +114,8 @@ where
         }
     }
 
-    pub fn pixels(&self) -> Pixels<F, D> {
-        Pixels {
+    pub fn texels(&self) -> Texels<F, D> {
+        Texels {
             inner: self.as_slice().iter().cloned(),
             total: self.width * self.height,
         }
@@ -173,32 +173,35 @@ mod tests {
     use image::*;
 
     macro_rules! test_type {
-        ($($type:ty => $ch:expr),+) => {
+        ($($type:ty, $data:ty => $ch:expr),+) => {
             #[test]
             fn test() {
                 $(
-                    let im = Image::<$type>::from_file("assets/lenna.png").unwrap();
+                    let im = Image::<$type, $data>::from_file("assets/lenna.png").unwrap();
                     assert_eq!(512, im.width());
                     assert_eq!(512, im.height());
                     assert_eq!($ch, im.channels());
-                    assert!(Image::<$type>::from_file(".").is_err());
+                    assert!(Image::<$type, $data>::from_file(".").is_err());
                 )+
             }
         }
     }
 
     test_type! {
-        R8 => 1,
-        Rg8 => 2,
-        Rgb8 => 3,
-        Rgba8 => 4,
-        R16 => 1,
-        Rg16 => 2,
-        Rgb16 => 3,
-        Rgba16 => 4,
-        R32f => 1,
-        Rg32f => 2,
-        Rgb32f => 3,
-        Rgba32f => 4
+        R, u8 => 1,
+        R, u16 => 1,
+        R, f32 => 1,
+
+        Rg, u8 => 2,
+        Rg, u16 => 2,
+        Rg, f32 => 2,
+
+        Rgb, u8 => 3,
+        Rgb, u16 => 3,
+        Rgb, f32 => 3,
+
+        Rgba, u8 => 4,
+        Rgba, u16 => 4,
+        Rgba, f32 => 4
     }
 }

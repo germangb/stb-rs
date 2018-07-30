@@ -1,14 +1,14 @@
 extern crate bindgen;
 extern crate cc;
 
-use std::{path, env, fs};
+use std::{env, fs, path};
 
 macro_rules! out {
     ($path:tt) => {{
         let mut path = path::PathBuf::from(env::var("OUT_DIR").unwrap());
         path.push($path);
         path
-    }}
+    }};
 }
 
 fn build_stb_image() {

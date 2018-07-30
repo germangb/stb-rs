@@ -2,13 +2,13 @@ use super::ffi;
 
 use std::os::raw;
 
-pub trait PixelFormat<D> {
+pub trait TexelFormat<D> {
     type Item: Copy;
 
     fn size() -> usize;
 }
 
-pub trait PixelData {
+pub trait TexelData {
     unsafe fn load_from_memory(
         buffer: *const ffi::stbi_uc,
         len: raw::c_int,
@@ -22,7 +22,7 @@ pub trait PixelData {
 macro_rules! impl_data {
     ( $($type:ty => $ffi:path),+ ) => {
         $(
-            impl PixelData for $type {
+            impl TexelData for $type {
                 unsafe fn load_from_memory(
                     buffer: *const ffi::stbi_uc,
                     len: raw::c_int,
@@ -57,7 +57,7 @@ macro_rules! impl_formats {
         $(
             $(#[$meta_enum])*
             pub enum $enum {}
-            impl<$T: Copy> PixelFormat<$T> for $enum {
+            impl<$T: Copy> TexelFormat<$T> for $enum {
                 type Item = $item;
                 #[inline]
                 fn size() -> usize {

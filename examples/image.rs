@@ -8,9 +8,9 @@ fn main() {
     assert_eq!(512, image.width());
     assert_eq!(512, image.height());
 
-    println!("{:?}", image.pixels().next());
+    println!("{:?}", image.texels().next());
 
-    for (r, g, b) in image.pixels() {
+    for (r, g, b) in image.texels() {
         //println!("{}, {}, {}", r, g, b);
     }
 }
