@@ -1,16 +1,23 @@
 extern crate stb;
 
-use stb::image::Image;
+use stb::image::{Image, Rgb32f};
 
 use std::fs::File;
 use std::error::Error;
 
 fn main() -> Result<(), Box<Error>> {
     // load as 8bit rgb
-    let image: Image<u8> = Image::from_reader(File::open("assets/lenna.png")?, 3)?;
+    let image: Image<Rgb32f> = Image::from_file("assets/lenna.png")?;
 
-    // load as f32 rgb
-    let image: Image<f32> = Image::from_reader(File::open("assets/lenna.png")?, 3)?;
+    assert_eq!(512, image.width());
+    assert_eq!(512, image.height());
+    assert_eq!(3, image.channels());
+
+    println!("{:?}", image.as_ptr());
+
+    for (r, g, b) in image.pixels() {
+        //println!("{}, {}, {}", r, g, b);
+    }
 
     Ok(())
 }
