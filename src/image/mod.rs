@@ -88,11 +88,6 @@ where
     F: TexelFormat<D>,
 {
     #[inline]
-    pub fn channels(&self) -> usize {
-        F::size()
-    }
-
-    #[inline]
     pub fn width(&self) -> usize {
         self.width
     }
@@ -180,7 +175,6 @@ mod tests {
                     let im = Image::<$type, $data>::from_file("assets/lenna.png").unwrap();
                     assert_eq!(512, im.width());
                     assert_eq!(512, im.height());
-                    assert_eq!($ch, im.channels());
                     assert!(Image::<$type, $data>::from_file(".").is_err());
                 )+
             }
