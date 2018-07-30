@@ -18,9 +18,7 @@ use {Error, Result};
 use self::format::PixelFormat;
 
 pub use self::format::{
-    R8, Rg8, Rgb8, Rgba8,
-    R16, Rg16, Rgb16, Rgba16,
-    R32f, Rg32f, Rgb32f, Rgba32f,
+    R16, R32f, R8, Rg16, Rg32f, Rg8, Rgb16, Rgb32f, Rgb8, Rgba16, Rgba32f, Rgba8,
 };
 
 pub struct Pixels<'a, F>
@@ -31,10 +29,7 @@ where
     total: usize,
 }
 
-impl<'a, F> ExactSizeIterator for Pixels<'a, F>
-where
-    F: 'a + PixelFormat,
-{}
+impl<'a, F> ExactSizeIterator for Pixels<'a, F> where F: 'a + PixelFormat {}
 
 impl<'a, F> Iterator for Pixels<'a, F>
 where
@@ -57,19 +52,14 @@ pub struct Image<P: PixelFormat> {
     data: *mut P,
 }
 
-unsafe impl<P> Send for Image<P>
-where
-    P: PixelFormat,
-{}
+unsafe impl<P> Send for Image<P> where P: PixelFormat {}
 
 impl<P> Drop for Image<P>
 where
     P: PixelFormat,
 {
     fn drop(&mut self) {
-        unsafe {
-            ffi::stbi_image_free(self.data as _)
-        }
+        unsafe { ffi::stbi_image_free(self.data as _) }
     }
 }
 
@@ -97,7 +87,9 @@ impl<F: PixelFormat> Image<F> {
     pub fn pixels(&self) -> Pixels<F> {
         unsafe {
             let s = self.width * self.height;
-            let iter = slice::from_raw_parts(self.data as *const F::Item, s).iter().cloned();
+            let iter = slice::from_raw_parts(self.data as *const F::Item, s)
+                .iter()
+                .cloned();
 
             Pixels {
                 inner: iter,
@@ -128,7 +120,8 @@ impl<F: PixelFormat> Image<F> {
                 data.len() as _,
                 &mut width,
                 &mut height,
-                &mut channels);
+                &mut channels,
+            );
 
             if image_data.is_null() {
                 let failure_reason = CStr::from_ptr(ffi::stbi_failure_reason() as _)

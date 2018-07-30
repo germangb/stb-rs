@@ -7,11 +7,13 @@ pub trait PixelFormat {
 
     fn size() -> usize;
 
-    unsafe fn load_from_memory(buffer: *const ffi::stbi_uc,
-                               len: raw::c_int,
-                               x: &mut raw::c_int,
-                               y: &mut raw::c_int,
-                               c: &mut raw::c_int) -> *mut Self;
+    unsafe fn load_from_memory(
+        buffer: *const ffi::stbi_uc,
+        len: raw::c_int,
+        x: &mut raw::c_int,
+        y: &mut raw::c_int,
+        c: &mut raw::c_int,
+    ) -> *mut Self;
 }
 
 macro_rules! impl_formats {
