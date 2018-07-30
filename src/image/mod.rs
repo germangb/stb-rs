@@ -6,6 +6,8 @@ pub mod ffi {
     include!(concat!(env!("OUT_DIR"), "/stb_image.rs"));
 }
 
+use std::marker::PhantomData;
+
 use std::ffi::CStr;
 use std::fs;
 use std::path::Path;
@@ -15,25 +17,35 @@ use std::slice;
 
 use {Error, Result};
 
-use self::format::PixelFormat;
+use self::format::{PixelData, PixelFormat};
 
+/*
 pub use self::format::{
     R16, R32f, R8, Rg16, Rg32f, Rg8, Rgb16, Rgb32f, Rgb8, Rgba16, Rgba32f, Rgba8,
 };
+*/
 
-pub struct Pixels<'a, F>
+pub use self::format::{Rg, Rgb, Rgba, R};
+
+pub struct Pixels<'a, F, D>
 where
-    F: 'a + PixelFormat,
+    D: 'a + PixelData,
+    F: 'a + PixelFormat<D>,
 {
     inner: Cloned<slice::Iter<'a, F::Item>>,
     total: usize,
 }
 
-impl<'a, F> ExactSizeIterator for Pixels<'a, F> where F: 'a + PixelFormat {}
-
-impl<'a, F> Iterator for Pixels<'a, F>
+impl<'a, F, D> ExactSizeIterator for Pixels<'a, F, D>
 where
-    F: 'a + PixelFormat,
+    D: 'a + PixelData,
+    F: 'a + PixelFormat<D>,
+{}
+
+impl<'a, F, D> Iterator for Pixels<'a, F, D>
+where
+    D: 'a + PixelData,
+    F: 'a + PixelFormat<D>,
 {
     type Item = F::Item;
 
@@ -46,24 +58,35 @@ where
     }
 }
 
-pub struct Image<P: PixelFormat> {
+pub struct Image<P: PixelFormat<D>, D: PixelData> {
     width: usize,
     height: usize,
     data: *mut P,
+    _ph: PhantomData<D>,
 }
 
-unsafe impl<P> Send for Image<P> where P: PixelFormat {}
-
-impl<P> Drop for Image<P>
+unsafe impl<P, D> Send for Image<P, D>
 where
-    P: PixelFormat,
+    P: PixelFormat<D>,
+    D: PixelData,
+{
+}
+
+impl<P, D> Drop for Image<P, D>
+where
+    D: PixelData,
+    P: PixelFormat<D>,
 {
     fn drop(&mut self) {
         unsafe { ffi::stbi_image_free(self.data as _) }
     }
 }
 
-impl<F: PixelFormat> Image<F> {
+impl<F, D> Image<F, D>
+where
+    D: PixelData,
+    F: PixelFormat<D>,
+{
     #[inline]
     pub fn channels(&self) -> usize {
         F::size()
@@ -84,17 +107,17 @@ impl<F: PixelFormat> Image<F> {
         self.data
     }
 
-    pub fn pixels(&self) -> Pixels<F> {
+    pub fn as_slice(&self) -> &[F::Item] {
         unsafe {
             let s = self.width * self.height;
-            let iter = slice::from_raw_parts(self.data as *const F::Item, s)
-                .iter()
-                .cloned();
+            slice::from_raw_parts(self.data as *const F::Item, s)
+        }
+    }
 
-            Pixels {
-                inner: iter,
-                total: s,
-            }
+    pub fn pixels(&self) -> Pixels<F, D> {
+        Pixels {
+            inner: self.as_slice().iter().cloned(),
+            total: self.width * self.height,
         }
     }
 
@@ -115,12 +138,13 @@ impl<F: PixelFormat> Image<F> {
         let mut channels = 0;
 
         unsafe {
-            let image_data = F::load_from_memory(
+            let image_data = D::load_from_memory(
                 data.as_ptr(),
                 data.len() as _,
                 &mut width,
                 &mut height,
                 &mut channels,
+                F::size() as _,
             );
 
             if image_data.is_null() {
@@ -137,7 +161,8 @@ impl<F: PixelFormat> Image<F> {
             Ok(Image {
                 width,
                 height,
-                data: image_data,
+                data: image_data as _,
+                _ph: PhantomData,
             })
         }
     }
@@ -156,7 +181,6 @@ mod tests {
                     assert_eq!(512, im.width());
                     assert_eq!(512, im.height());
                     assert_eq!($ch, im.channels());
-                    //assert_eq!(512*512*3, im.len());
                     assert!(Image::<$type>::from_file(".").is_err());
                 )+
             }
