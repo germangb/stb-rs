@@ -1,25 +1,13 @@
 extern crate bindgen;
 extern crate cc;
 
-use std::{env, fs, path};
+use std::{env, path};
 
-macro_rules! out {
-    ($path:tt) => {{
-        let mut path = path::PathBuf::from(env::var("OUT_DIR").unwrap());
-        path.push($path);
-        path
-    }};
-}
-
-fn build_stb_image() {
-    fs::copy("stb/stb_image.h", out!("stb_image.c").to_str().unwrap())
-        .expect("Error copying stb_image.h -> stb_image.c");
-
+fn main() {
     cc::Build::new()
-        .file(out!("stb_image.c").to_str().unwrap())
+        .file("build.c")
         .define("STB_IMAGE_IMPLEMENTATION", None)
-
-        //TODO support defines
+        .warnings(false)
         .compile("stb_image");
 
     //println!("cargo:rustc-link-lib=stb_image");
@@ -38,10 +26,13 @@ fn build_stb_image() {
         .expect("Error generating bindings!!")
         
         // write to disk
-        .write_to_file(out!("stb_image.rs").to_str().unwrap())
-        .expect("Error writing bindings!!");
-}
+        .write_to_file({
+            let mut path = path::PathBuf::from(
+                env::var_os("OUT_DIR").unwrap().to_str().unwrap()
+            );
 
-fn main() {
-    build_stb_image();
+            path.push("stb_image.rs");
+            path
+        })
+        .expect("Error writing bindings!!");
 }
